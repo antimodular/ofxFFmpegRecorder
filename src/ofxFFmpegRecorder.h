@@ -168,7 +168,7 @@ public:
     bool startCustomStreaming();
 
     /**
-     * @brief Add a frame to the stream. This can onle be used If you started recording a custom video. Make sure that the frames are added continuously.
+     * @brief Add a frame to the stream. This can only be used If you started recording a custom video. Make sure that the frames are added continuously.
      * @param pixels
      * @return
      */
@@ -260,6 +260,8 @@ public:
     void saveThumbnail(const unsigned int &hour, const unsigned int &minute, const float &second, const std::string &output, glm::vec2 size = glm::vec2(0, 0),
                        ofRectangle crop = ofRectangle(0, 0, 0, 0), std::string videoFilePath = "");
 
+    bool joinVideoAudio(std::string _videoFilePath, std::string _audioFilepath);
+    
 private:
     std::string m_FFmpegPath, m_OutputPath;
     bool m_IsRecordVideo, m_IsRecordAudio;
@@ -288,12 +290,13 @@ private:
      * @brief If the default video device is not set, the default one is automatically set by this class
      */
     ofVideoDevice m_DefaultVideoDevice;
-
+    int m_DefaultVideoDeviceIndex;
     /**
      * @brief If the default audio device is not set, the default one is automatically set by this class
      */
     ofSoundDevice m_DefaultAudioDevice;
-
+    int m_DefaultAudioDeviceIndex;
+    
     std::string m_VideCodec;
     std::string m_AudioCodec;
     FILE *m_CustomRecordingFile, *m_DefaultRecordingFile;
@@ -307,7 +310,7 @@ private:
 
     /**
      * @brief Additional arguments can be used to extend the functionality of ofxFFmpegRecorder. Additional arguments are used
-     * in both webcam recording and custom reciording. Thumbnail saving is not affected by these.
+     * in both webcam recording and custom recording. Thumbnail saving is not affected by these.
      */
     std::vector<std::string> m_AdditionalInputArguments, m_AdditionalOutputArguments;
 
@@ -317,6 +320,7 @@ private:
 
     std::string mPixFmt = "rgb24";
 
+   
 private:
     /**
      * @brief Checks if the current default devices are still available. If they are not, gets the first available device for both audio and video.
@@ -329,5 +333,6 @@ private:
     void processFrame();
     void processBuffer();
     void joinThread();
+
 
 };

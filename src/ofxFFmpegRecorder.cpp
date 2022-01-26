@@ -211,16 +211,16 @@ void ofxFFmpegRecorder::setVideoCodec(const std::string &codec)
 }
 
 float ofxFFmpegRecorder::getWidth() {
-	return m_VideoSize.x;
+    return m_VideoSize.x;
 }
 void ofxFFmpegRecorder::setWidth(float aw) {
-	m_VideoSize.x = aw;
+    m_VideoSize.x = aw;
 }
 float ofxFFmpegRecorder::getHeight() {
-	return m_VideoSize.y;
+    return m_VideoSize.y;
 }
 void ofxFFmpegRecorder::setHeight(float ah) {
-	m_VideoSize.y = ah;
+    m_VideoSize.y = ah;
 }
 
 bool ofxFFmpegRecorder::isPaused() const
@@ -249,16 +249,16 @@ void ofxFFmpegRecorder::setPaused(bool paused)
 
 void ofxFFmpegRecorder::setPixelFormat(ofImageType aType)
 {
-	mPixFmt = "rgb24";
-	if (aType == OF_IMAGE_COLOR) {
-		mPixFmt = "rgb24";
-	}
-	else if (aType == OF_IMAGE_GRAYSCALE) {
-		mPixFmt = "gray";
-	}
-	else {
-		ofLogError() << "unsupported format, setting to OF_IMAGE_COLOR";
-	}
+    mPixFmt = "rgb24";
+    if (aType == OF_IMAGE_COLOR) {
+        mPixFmt = "rgb24";
+    }
+    else if (aType == OF_IMAGE_GRAYSCALE) {
+        mPixFmt = "gray";
+    }
+    else {
+        ofLogError() << "unsupported format, setting to OF_IMAGE_COLOR";
+    }
 }
 
 float ofxFFmpegRecorder::getRecordedDuration() const
@@ -271,6 +271,7 @@ float ofxFFmpegRecorder::getRecordedAudioDuration(float afps) const
     return m_AddedAudioFrames / afps;
 }
 
+//MARK: record directly from device not through ofVideoGrabber
 bool ofxFFmpegRecorder::record(float duration)
 {
     if (isRecording()) {
@@ -291,58 +292,73 @@ bool ofxFFmpegRecorder::record(float duration)
     determineDefaultDevices();
     m_CaptureDuration = duration;
 
-    std::vector<std::string> args;
-
+//    std::vector<std::string> args;
+    std::string args = "";
+    
 #if defined(_WIN32)
-    args.push_back("-f dshow");
+    args += "-f dshow";
 #elif defined(__APPLE__)
-    args.push_back("-f avfoundation");
+    args += "-f avfoundation";
 #else
-    args.push_back("-f v4l2");
+    args += "-f v4l2";
 #endif // PLATFORM_CHECK
-
+    
+    args += " -y";
+    
     if (m_CaptureDuration > 0.f) {
-        args.push_back("-t " + std::to_string(m_CaptureDuration));
+        args += " -t " + std::to_string(m_CaptureDuration); //-t duration , http://www.ffmpeg.org/ffmpeg.html#Main-options
     }
-
+    
+    args += " -framerate " + std::to_string(m_Fps); // set framerate
+    args += " -video_size " + std::to_string(static_cast<unsigned int>(m_VideoSize.x)) + "x" + std::to_string(static_cast<unsigned int>(m_VideoSize.y)); // -s same as -video_size sets input resolution
+    args += " -pixel_format uyvy422";
+    
     std::string inputDevices;
+    inputDevices += "\"";
     if (m_IsRecordVideo) {
-        inputDevices += "video=\"" + m_DefaultVideoDevice.deviceName + "\"";
+        //        inputDevices += "video=\"" + m_DefaultVideoDevice.deviceName + "\"";
+        inputDevices += ofToString(m_DefaultVideoDeviceIndex);
     }
-
+    
+    inputDevices += ":";
+    
     if (m_IsRecordAudio) {
-        if (inputDevices.length() > 0) {
-            inputDevices += ":";
-        }
-
-        inputDevices += "audio=\"" + m_DefaultAudioDevice.name + "\"";
+        inputDevices += ofToString(m_DefaultAudioDeviceIndex);
     }
+    inputDevices += "\"";
+   
+    //    std::copy(m_AdditionalInputArguments.begin(), m_AdditionalInputArguments.end(), std::back_inserter(args));
+    //    args = 
+    args += " -i " + inputDevices;
+    args += " -vcodec " + m_VideCodec;// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
+    args += " -b:v " + std::to_string(m_BitRate) + "k";
+    args += " -framerate " + std::to_string(m_Fps);
+    args += " -pix_fmt yuv420p";
+    args += " " + m_OutputPath;
 
-    args.push_back("-y");
-    std::copy(m_AdditionalInputArguments.begin(), m_AdditionalInputArguments.end(), std::back_inserter(args));
-    args.push_back("-i " + inputDevices);
-
-    args.push_back("-b:v " + std::to_string(m_BitRate) + "k");
-    args.push_back(m_OutputPath);
-
-    std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
-
+//    std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
+    
     std::string cmd = m_FFmpegPath + " ";
-    for (auto arg : args) {
-        cmd += arg + " ";
-    }
-
-    #if defined(_WIN32)
+    cmd += args + " ";
+    ofLog()<<"cmd:"<<cmd;
+    
+#if defined(_WIN32)
     m_DefaultRecordingFile = _popen(cmd.c_str(), "w");
 #else
     m_DefaultRecordingFile = popen(cmd.c_str(), "w");
 #endif
 
     return true;
+    
+    //for better audio quality and sync record video and audio on different threads
+    ///Users/stephanschulz/Downloads/ffmpeg -f avfoundation -framerate 30 -thread_queue_size 1024 -pixel_format uyvy422 -i "0:" -f avfoundation -thread_queue_size 1024 -i ":0" -c:v hap -format hap -y out2.mov -async 1
+    
 }
 
 bool ofxFFmpegRecorder::startCustomRecord()
 {
+    //this method of recording relies on ofPixel frame being added in ofApp::draw()
+    
     if (isRecording()) {
         LOG_ERROR("A recording is already in proggress.");
         return false;
@@ -357,21 +373,46 @@ bool ofxFFmpegRecorder::startCustomRecord()
         LOG_ERROR("The output file already exists and overwriting is disabled. Cannot capture video.");
         return false;
     }
-
+    
     m_AddedVideoFrames = 0;
-
+    
     std::vector<std::string> args;
     std::copy(m_AdditionalInputArguments.begin(), m_AdditionalInputArguments.end(), std::back_inserter(args));
-
-	//args.push_back("-pix_fmts");
-    args.push_back("-y");
-    args.push_back("-an");
-    args.push_back("-r " + std::to_string(m_Fps));
+    
+    
+    //input pixel buffer / video frame settings
+    args.push_back("-y"); // -y Overwrite output files without asking, https://ffmpeg.org/ffmpeg.html#Main-options
+    args.push_back("-an"); //-an option drops the audio, https://ffmpeg.org/ffmpeg.html#Audio-Options
+    //    args.push_back("-r " + std::to_string(m_Fps)); // set framerate
+    args.push_back("-framerate " + std::to_string(m_Fps)); // set framerate
+    args.push_back("-video_size " + std::to_string(static_cast<unsigned int>(m_VideoSize.x)) + "x" + std::to_string(static_cast<unsigned int>(m_VideoSize.y))); // -s same as -video_size sets input resolution
+    args.push_back("-f rawvideo"); // -f video format, rawvideo since we manually add FBO pixel buffer frames
+    //    args.push_back("-pix_fmt rgb24");
+    args.push_back("-pix_fmt " + mPixFmt); //-pixel format, https://ffmpeg.org/ffmpeg.html#Advanced-Video-options
+    args.push_back("-vcodec rawvideo");
+    
+    //input file options, https://ffmpeg.org/ffmpeg.html#toc-Description
+    //in this video capture example input file == output file 
+    args.push_back("-i -");
+    args.push_back("-vcodec " + m_VideCodec);// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
+//    args.push_back("-c:v hap -format hap "); 
+    args.push_back("-b:v " + std::to_string(m_BitRate) + "k"); // video bitrate, 
     args.push_back("-framerate " + std::to_string(m_Fps));
+    args.push_back("-pix_fmt yuv420p"); //
+    
+   
+    //m_AdditionalOutputArguments like filters or conversion to other codec like HAP
+    std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
+    
+    /*
+     args.push_back("-y");
+     args.push_back("-an");
+     args.push_back("-r " + std::to_string(m_Fps));
+     args.push_back("-framerate " + std::to_string(m_Fps));
     args.push_back("-s " + std::to_string(static_cast<unsigned int>(m_VideoSize.x)) + "x" + std::to_string(static_cast<unsigned int>(m_VideoSize.y)));
     args.push_back("-f rawvideo");
     //args.push_back("-pix_fmt rgb24");
-	args.push_back("-pix_fmt " + mPixFmt);
+    args.push_back("-pix_fmt " + mPixFmt);
     args.push_back("-vcodec rawvideo");
     args.push_back("-i -");
     
@@ -379,7 +420,9 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-vcodec " + m_VideCodec);
     args.push_back("-b:v " + std::to_string(m_BitRate) + "k");
     args.push_back("-r " + std::to_string(m_Fps));
+    args.push_back("-pix_fmt yuv420p");
     args.push_back("-framerate " + std::to_string(m_Fps));
+     */
     std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
     
     args.push_back(m_OutputPath);
@@ -389,7 +432,10 @@ bool ofxFFmpegRecorder::startCustomRecord()
     for (auto arg : args) {
         cmd += arg + " ";
     }
-
+    
+    ofLog()<<"cmd: "<<cmd;
+//../../../data/ffmpeg/osx/ffmpeg -y -an -r 30.000000 -framerate 30.000000 -s 1280x720 -f rawvideo -pix_fmt rgb24 -vcodec rawvideo -i - -vcodec libx264 -b:v 8000k -r 30.000000 -framerate 30.000000 /Applications/of_v0.11.0_osx_release/addons/ofxFFmpegRecorder/example/bin/data/2021-02-05-12-56-34-203.mp4 
+    
 #if defined(_WIN32)
     m_CustomRecordingFile = _popen(cmd.c_str(), "wb");
 #else
@@ -775,28 +821,38 @@ void ofxFFmpegRecorder::saveThumbnail(const unsigned int &hour, const unsigned i
 
 void ofxFFmpegRecorder::determineDefaultDevices()
 {
+    ofLog()<<"determineDefaultDevices()";
+    
     if (m_IsRecordVideo && m_DefaultVideoDevice.deviceName.length() == 0) {
         ofVideoGrabber videoGrabber;
         const std::vector<ofVideoDevice> devices = videoGrabber.listDevices();
-
+        int temp_index = 0;
         for (const ofVideoDevice &device : devices) {
+            ofLog()<<device.deviceName;
             if (device.bAvailable) {
                 m_DefaultVideoDevice = device;
+                m_DefaultVideoDeviceIndex = temp_index;
                 break;
             }
+            temp_index++;
         }
+        videoGrabber.close();
     }
 
     if (m_IsRecordAudio && m_DefaultAudioDevice.isDefaultInput == false) {
         ofSoundStream soundStream;
         const std::vector<ofSoundDevice> audoDevices = soundStream.getDeviceList();
-
+        int temp_index = 0;
         for (const ofSoundDevice &device : audoDevices) {
+            ofLog()<<device.name;
             if (device.isDefaultInput) {
                 m_DefaultAudioDevice = device;
+                m_DefaultAudioDeviceIndex = temp_index;
                 break;
             }
+            temp_index++;
         }
+        soundStream.close();
     }
 }
 
@@ -840,4 +896,42 @@ void ofxFFmpegRecorder::joinThread()
     if (m_Thread.joinable()) {
         m_Thread.join();
     }
+}
+
+bool ofxFFmpegRecorder::joinVideoAudio(std::string _videoFilePath, std::string _audioFilepath){
+    
+    ofLog()<<"joinVideoAudio()";
+    
+    //ffmpeg -i video.mp4 -i audio.wav -c copy output.mkv
+    
+    if (m_OutputPath.length() == 0) {
+        LOG_ERROR("Output path is empty. Cannot record.");
+        return false;
+    }
+
+    if (ofFile::doesFileExist(m_OutputPath, false) && m_IsOverWrite == false) {
+        LOG_ERROR("The output file already exists and overwriting is disabled. Cannot capture video.");
+        return false;
+    }
+    
+    std::string args = "";
+    args += " -y";
+    args += " -i " + _videoFilePath;
+    args += " -i " + _audioFilepath;
+    args += " -c copy "+ m_OutputPath;
+    
+    std::string cmd = m_FFmpegPath + " ";
+    //    for (auto arg : args) {
+    //        cmd += arg + " ";
+    //    }
+    cmd += args + " ";
+    ofLog()<<"cmd:"<<cmd;
+    
+#if defined(_WIN32)
+    m_DefaultRecordingFile = _popen(cmd.c_str(), "w");
+#else
+    m_DefaultRecordingFile = popen(cmd.c_str(), "w");
+#endif
+    
+    return true;
 }

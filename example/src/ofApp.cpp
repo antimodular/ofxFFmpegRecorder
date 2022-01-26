@@ -3,6 +3,7 @@
 
 void ofApp::setup() {
 
+  
     ofSoundStreamSettings settings;
 
     // if you want to set the device id to be different than the default
@@ -17,12 +18,12 @@ void ofApp::setup() {
     // settings.api = ofSoundDevice::Api::PULSE;
 
     // or by name
-    /*auto devices = soundStream.getMatchingDevices("default");
-    if(!devices.empty()){
-        settings.setInDevice(devices[0]);
-    }*/
+   // auto devices = soundStream.getMatchingDevices("default");
+    //if(!devices.empty()){
+     //   settings.setInDevice(devices[0]);
+   // }
 
-    settings.setInDevice(devices[2]);
+    settings.setInDevice(devices[0]);
     settings.setInListener(this);
     settings.sampleRate = 44100;
     settings.numOutputChannels = 0;
@@ -34,16 +35,17 @@ void ofApp::setup() {
     mCapFbo.allocate( m_Grabber.getWidth(), m_Grabber.getHeight(), GL_RGB );
     //mCapFbo.allocate( 1280,720, GL_RGB );
 
+    //setup(bool recordVideo, bool recordAudio, glm::vec2 videoSize, float fps, unsigned int bitrate, const std::string &ffmpegPath)
     m_Recorder.setup(true, false, glm::vec2(m_Grabber.getWidth(), m_Grabber.getHeight()) );
     m_Recorder.setAudioConfig(1024,44100);
     m_Recorder.setOverWrite(true);
+    
     
     #if defined(TARGET_OSX)
     m_Recorder.setFFmpegPath(ofToDataPath("ffmpeg/osx/ffmpeg"));
     #elif defined(TARGET_WIN32)
     m_Recorder.setFFmpegPath(ofToDataPath("ffmpeg/win/ffmpeg.exe"));
     #endif
-    
     /**
      * You can also use the following methods to crop the output file
      *     m_Recorder.addAdditionalOutputArgument("-vf \"crop=300:300:0:0\"");
@@ -54,6 +56,8 @@ void ofApp::setup() {
     isRecordingVideo = false;
     isRecordingAudio = false;
 
+    //libx264
+    ofLog()<<"getVideoCodec "<<m_Recorder.getVideoCodec();
     audioFPS = 0.0f;
     audioCounter    = 0;
     bufferCounter	= 0;
@@ -61,18 +65,21 @@ void ofApp::setup() {
 }
 
 void ofApp::update() {
-    m_Grabber.update();
+     m_Grabber.update();
 }
 
 void ofApp::draw() {
     
+
     mCapFbo.begin(); {
         ofBackground(0);
         ofSetColor( 255 );
         m_Grabber.draw(0, 0, mCapFbo.getWidth(), mCapFbo.getHeight() );
-        /*ofSetColor(ofColor::green);
-        if( m_Recorder.isRecording() ) ofSetColor( ofColor::red );
-        ofDrawCircle( mCapFbo.getWidth()/2, mCapFbo.getHeight()/2, ((sin( ofGetElapsedTimef() * 6.) * 0.5 + 0.5) + 0.5) * 100 + 20);*/
+        ofDrawCircle(mouseX,mouseY, 30);
+       // ofSetColor(ofColor::green);
+      //  if( m_Recorder.isRecording() ) ofSetColor( ofColor::red );
+     //   ofDrawCircle( mCapFbo.getWidth()/2, mCapFbo.getHeight()/2, ((sin( ofGetElapsedTimef() * 6.) * 0.5 + 0.5) + 0.5) * 100 + 20);
+     
     } mCapFbo.end();
     
     if( m_Recorder.isRecording() ) {
@@ -85,11 +92,13 @@ void ofApp::draw() {
         }
     }
     
+    ofSetColor( 255 );
     mCapFbo.draw(0,0);
 
     ofSetColor(255,255,220);
     waveform.draw();
-    
+
+
     if(isRecordingVideo){
         ofDrawBitmapStringHighlight(std::to_string(m_Recorder.getRecordedDuration()), 40, 45);
     }else if(isRecordingAudio){
@@ -137,19 +146,28 @@ void ofApp::keyReleased(int key) {
             isRecordingVideo = false;
         } else {
 #if defined(TARGET_OSX)
-            m_Recorder.setOutputPath( ofToDataPath(ofGetTimestampString() + ".mp4", true ));
+            m_Recorder.setOutputPath( ofToDataPath(ofGetTimestampString() + ".mov", true ));
 #else
             m_Recorder.setOutputPath( ofToDataPath(ofGetTimestampString() + ".avi", true ));
 #endif
 
+            /*
+             VideoCodec: libx264
+             VideoBitrate: 2000k
+             PixelFormat: rgb24
+             OutputPixelFormat: yuv420p
+             */
+//            isRecordingAudio = true;
+            
             m_Recorder.setVideoCodec("libx264");
             m_Recorder.setBitRate(8000);
-
+            m_Recorder.setPixelFormat(OF_IMAGE_COLOR);
+            
             isRecordingVideo = true;
             m_Recorder.startCustomRecord();
         }
     } else if (key == 't') {
-        m_Recorder.saveThumbnail(0, 0, 2, "thumbnail.png", ofVec2f(0, 0), ofRectangle(0, 0, 500, 400));
+        m_Recorder.saveThumbnail(0, 0, 2, ofToDataPath("thumbnail.png"), ofVec2f(0, 0), ofRectangle(0, 0, 500, 400));
     }else if(key == 's'){
         m_Recorder.startCustomStreaming();
     }else if(key == 'a'){
@@ -162,6 +180,18 @@ void ofApp::keyReleased(int key) {
             isRecordingAudio = true;
             m_Recorder.startCustomAudioRecord();
         }
+    }
+    if(key == 'c') m_Grabber.close();
+    if(key == 'm'){
+        
+        m_Recorder.setRecordVideo(true);
+        m_Recorder.setRecordAudio(true);
+#if defined(TARGET_OSX)
+            m_Recorder.setOutputPath( ofToDataPath(ofGetTimestampString() + ".mp4", true ));
+#else
+            m_Recorder.setOutputPath( ofToDataPath(ofGetTimestampString() + ".avi", true ));
+#endif
+        m_Recorder.record(5);
     }
 }
 
