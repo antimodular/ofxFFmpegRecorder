@@ -10,29 +10,31 @@
 #define LOG_NOTICE(message) ofLogNotice("") << __FUNCTION__ << ":" << __LINE__ << ": " << message
 
 ofxFFmpegRecorder::ofxFFmpegRecorder()
-    : m_FFmpegPath("ffmpeg")
-    , m_OutputPath("")
-    , m_IsRecordVideo(false)
-    , m_IsRecordAudio(false)
-    , m_IsOverWrite(false)
-    , m_IsPaused(false)
-    , m_VideoSize(0, 0)
-    , m_BitRate(2000)
-    , m_AddedVideoFrames(0)
-    , m_AddedAudioFrames(0)
-    , m_Fps(30.f)
-    , m_bufferSize(1024)
-    , m_sampleRate(44100)
-    , m_CaptureDuration(0.f)
-    , m_TotalPauseDuration(0.f)
-    , m_DefaultVideoDevice()
-    , m_DefaultAudioDevice()
-    , m_VideCodec("mpeg4")
-    , m_AudioCodec("libmp3lame")
-    , m_CustomRecordingFile(nullptr)
-    , m_DefaultRecordingFile(nullptr)
+: m_FFmpegPath("ffmpeg")
+, m_OutputPath("")
+, m_IsRecordVideo(false)
+, m_IsRecordAudio(false)
+, m_IsOverWrite(false)
+, m_IsPaused(false)
+, m_VideoSize(0, 0)
+, m_BitRate(2000)
+, m_AddedVideoFrames(0)
+, m_AddedAudioFrames(0)
+, m_Fps(30.f)
+, m_bufferSize(1024)
+, m_sampleRate(44100)
+, m_CaptureDuration(0.f)
+, m_TotalPauseDuration(0.f)
+, m_DefaultVideoDevice()
+, m_DefaultAudioDevice()
+, m_VideCodec("mpeg4")
+, m_VideOutCodec("mpeg4")
+, m_AudioCodec("libmp3lame")
+, m_CustomRecordingFile(nullptr)
+, m_DefaultRecordingFile(nullptr)
+, initialized(false)
 {
-
+    
 }
 
 ofxFFmpegRecorder::~ofxFFmpegRecorder()
@@ -200,6 +202,10 @@ std::string ofxFFmpegRecorder::getVideoCodec() const
 {
     return m_VideCodec;
 }
+std::string ofxFFmpegRecorder::getVideoOutCodec() const
+{
+    return m_VideOutCodec;
+}
 
 void ofxFFmpegRecorder::setVideoCodec(const std::string &codec)
 {
@@ -208,6 +214,15 @@ void ofxFFmpegRecorder::setVideoCodec(const std::string &codec)
     }
 
     m_VideCodec = codec;
+}
+
+void ofxFFmpegRecorder::setVideoOutCodec(const std::string &codec)
+{
+    if (isRecording()) {
+        LOG_NOTICE("A recording is in proggress. The change will take effect for the next recording session.");
+    }
+
+    m_VideOutCodec = codec;
 }
 
 float ofxFFmpegRecorder::getWidth() {
@@ -330,7 +345,7 @@ bool ofxFFmpegRecorder::record(float duration)
     //    std::copy(m_AdditionalInputArguments.begin(), m_AdditionalInputArguments.end(), std::back_inserter(args));
     //    args = 
     args += " -i " + inputDevices;
-    args += " -vcodec " + m_VideCodec;// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
+    args += " -vcodec " + m_VideOutCodec;// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
     args += " -b:v " + std::to_string(m_BitRate) + "k";
     args += " -framerate " + std::to_string(m_Fps);
     args += " -pix_fmt yuv420p";
@@ -389,12 +404,12 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-f rawvideo"); // -f video format, rawvideo since we manually add FBO pixel buffer frames
     //    args.push_back("-pix_fmt rgb24");
     args.push_back("-pix_fmt " + mPixFmt); //-pixel format, https://ffmpeg.org/ffmpeg.html#Advanced-Video-options
-    args.push_back("-vcodec rawvideo");
+    args.push_back("-vcodec " + m_VideCodec); //rawvideo");
     
     //input file options, https://ffmpeg.org/ffmpeg.html#toc-Description
     //in this video capture example input file == output file 
     args.push_back("-i -");
-    args.push_back("-vcodec " + m_VideCodec);// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
+    args.push_back("-vcodec " + m_VideOutCodec);// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
 //    args.push_back("-c:v hap -format hap "); 
     args.push_back("-b:v " + std::to_string(m_BitRate) + "k"); // video bitrate, 
     args.push_back("-framerate " + std::to_string(m_Fps));
@@ -417,7 +432,7 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-i -");
     
 
-    args.push_back("-vcodec " + m_VideCodec);
+    args.push_back("-vcodec " + m_VideOutCodec);
     args.push_back("-b:v " + std::to_string(m_BitRate) + "k");
     args.push_back("-r " + std::to_string(m_Fps));
     args.push_back("-pix_fmt yuv420p");
@@ -443,6 +458,7 @@ bool ofxFFmpegRecorder::startCustomRecord()
     m_CustomRecordingFile = popen( cmd.c_str(), "w" );
 #endif // _WIN32
 
+    initialized = true;
     return true;
 }
 
@@ -639,6 +655,8 @@ void ofxFFmpegRecorder::stop()
         #endif
         m_DefaultRecordingFile = nullptr;
     }
+    initialized = false;
+    outputFileComplete();
 }
 
 void ofxFFmpegRecorder::cancel()
@@ -665,6 +683,7 @@ void ofxFFmpegRecorder::cancel()
     }
 
     ofFile::removeFile(m_OutputPath, false);
+    initialized = false;
 }
 
 bool ofxFFmpegRecorder::isOverWrite() const
@@ -934,4 +953,32 @@ bool ofxFFmpegRecorder::joinVideoAudio(std::string _videoFilePath, std::string _
 #endif
     
     return true;
+}
+
+//--------------------------------------------------------------
+void ofxFFmpegRecorder::outputFileComplete()
+{
+    // at this point all data that ffmpeg wants should have been consumed
+    // one of the threads may still be trying to write a frame,
+    // but once close() gets called they will exit the non_blocking write loop
+    // and hopefully close successfully
+
+//    bIsInitialized = false;
+//
+//    if (bRecordVideo) {
+//        videoThread.close();
+//    }
+//    if (bRecordAudio) {
+//        audioThread.close();
+//    }
+
+//    retirePipeNumber(pipeNumber);
+
+//    ffmpegThread.waitForThread();
+    // TODO: kill ffmpeg process if its taking too long to close for whatever reason.
+
+    // Notify the listeners.
+    RecorderOutputFileCompleteEventArgs args;
+    args.fileName = m_OutputPath;
+    ofNotifyEvent(outputFileCompleteEvent, args);
 }

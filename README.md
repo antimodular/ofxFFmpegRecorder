@@ -13,6 +13,7 @@ A small class to utilize the video recording functionality of `ffmpeg`.
 - Join audio and video recordings in to a single file. See `example_joinAudio` for details.
 - Pass in HAP codec information.
 - macOS version uses ffmeg version 5.0
+- added some of the function to match naming convention of ofxVideoRecorder
 
 # Dependencies
 

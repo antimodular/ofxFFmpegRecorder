@@ -259,7 +259,7 @@ void ofApp::keyReleased(int key) {
             m_videoRecorder.setVideoCodec("libx264");
             m_videoRecorder.setBitRate(8000);
             m_videoRecorder.setPixelFormat(OF_IMAGE_COLOR);
-//            m_videoRecorder.setVideoCodec("hap -format hap ");
+//            m_videoRecorder.setVideoOutCodec("hap -format hap ");
             isRecordingVideo = true;
             m_videoRecorder.startCustomRecord();
             

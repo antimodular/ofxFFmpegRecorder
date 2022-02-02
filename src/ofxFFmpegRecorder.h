@@ -1,5 +1,7 @@
 #pragma once
 
+#include "ofMain.h"
+
 #include "ofTypes.h"
 
 #include "ofVideoBaseTypes.h"
@@ -67,6 +69,15 @@ private:
     typename TList::iterator m_HeadIt, m_TailIt;
 };
 
+//--------------------------------------------------------------
+//--------------------------------------------------------------
+class RecorderOutputFileCompleteEventArgs
+: public ofEventArgs
+{
+public:
+    std::string fileName;
+};
+
 class ofxFFmpegRecorder
 {
 public:
@@ -80,6 +91,7 @@ public:
      * @param ffmpegPath This variable is optional. If left empty, the default "ffmpeg" is used. This required that the "ffmpeg" is in the system's path.
      */
     
+    ofEvent<RecorderOutputFileCompleteEventArgs> outputFileCompleteEvent;
     
     void setup(bool recordVideo, bool recordAudio, glm::vec2 videoSize = glm::vec2(0,0), float fps = 30.f, unsigned int bitrate = 2000,
                const std::string &ffmpegPath = "");
@@ -115,6 +127,9 @@ public:
     std::string getVideoCodec() const;
     void setVideoCodec(const std::string &codec);
 
+    std::string getVideoOutCodec() const;
+    void setVideoOutCodec(const std::string &codec);
+    
     void setAudioConfig(int bufferSize, int sampleRate);
 
 	float getWidth();
@@ -152,7 +167,7 @@ public:
      * @return If the class was already recording a video/audio this method returns false, otherwise it returns true;
      */
     bool startCustomRecord();
-
+    bool start(){ startCustomRecord(); };
     /**
      * @brief Setup ffmpeg for a custom audio recording. This also inherits the
      * m_AdditionalArguments.
@@ -182,7 +197,7 @@ public:
     size_t addBuffer(const ofSoundBuffer &buffer, float afps);
 
     void stop();
-
+    void close() {stop();} ;
     /**
      * @brief Stops the recording and deletes the file.
      */
@@ -262,6 +277,7 @@ public:
 
     bool joinVideoAudio(std::string _videoFilePath, std::string _audioFilepath);
     
+    bool isInitialized() { return initialized; }
 private:
     std::string m_FFmpegPath, m_OutputPath;
     bool m_IsRecordVideo, m_IsRecordAudio;
@@ -298,6 +314,7 @@ private:
     int m_DefaultAudioDeviceIndex;
     
     std::string m_VideCodec;
+    std::string m_VideOutCodec;
     std::string m_AudioCodec;
     FILE *m_CustomRecordingFile, *m_DefaultRecordingFile;
 
@@ -320,8 +337,8 @@ private:
 
     std::string mPixFmt = "rgb24";
 
-   
-private:
+    bool initialized;
+
     /**
      * @brief Checks if the current default devices are still available. If they are not, gets the first available device for both audio and video.
      */
@@ -334,5 +351,7 @@ private:
     void processBuffer();
     void joinThread();
 
+    void outputFileComplete();
+    
 
 };
