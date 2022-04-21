@@ -19,7 +19,7 @@ public:
     void mouseReleased(int x, int y, int button);
 
     void audioIn(ofSoundBuffer & input);
-
+    void recordingComplete(RecorderOutputFileCompleteEventArgs& args);
 private:
     ofxFFmpegRecorder m_videoRecorder;
     ofxFFmpegRecorder m_audioRecorder;
@@ -40,4 +40,6 @@ private:
     bool     isRecordingVideo;
     bool     isRecordingAudio;
 
+    float joinTimer;
+    bool bJoin = false;
 };

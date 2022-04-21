@@ -60,7 +60,7 @@ void ofApp::setup() {
     ofLog()<<"getVideoCodec "<<m_Recorder.getVideoCodec();
     audioFPS = 0.0f;
     audioCounter    = 0;
-    bufferCounter	= 0;
+    bufferCounter    = 0;
     lastAudioTimeReset = ofGetElapsedTimeMillis();
 }
 
@@ -159,9 +159,14 @@ void ofApp::keyReleased(int key) {
              */
 //            isRecordingAudio = true;
             
-            m_Recorder.setVideoCodec("libx264");
+//            m_Recorder.setVideoCodec("libx264");
+//            m_Recorder.setBitRate(8000);
+//            m_Recorder.setPixelFormat(OF_IMAGE_COLOR);
+      
+            m_Recorder.setVideoCodec("hap");
             m_Recorder.setBitRate(8000);
             m_Recorder.setPixelFormat(OF_IMAGE_COLOR);
+            
             
             isRecordingVideo = true;
             m_Recorder.startCustomRecord();

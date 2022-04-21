@@ -8,7 +8,7 @@ void ofApp::setup() {
 
     // if you want to set the device id to be different than the default
     auto devices = soundStream.getDeviceList();
-    //settings.device = devices[2];
+//    settings.device = devices[0];
 
     // you can also get devices for an specific api
     // auto devices = soundStream.getDevicesByApi(ofSoundDevice::Api::PULSE);
@@ -23,7 +23,7 @@ void ofApp::setup() {
      //   settings.setInDevice(devices[0]);
    // }
 
-    settings.setInDevice(devices[0]);
+    settings.setInDevice(devices[1]);
     settings.setInListener(this);
     settings.sampleRate = 44100;
     settings.numOutputChannels = 0;
@@ -31,7 +31,8 @@ void ofApp::setup() {
     settings.bufferSize = 1024;
     soundStream.setup(settings);
     
-   // m_Grabber.setup(1280,720);
+    m_Grabber.setDeviceID(0);
+    m_Grabber.setup(1280,720);
     mCapFbo.allocate( m_Grabber.getWidth(), m_Grabber.getHeight(), GL_RGB );
     //mCapFbo.allocate( 1280,720, GL_RGB );
 
@@ -59,6 +60,8 @@ void ofApp::setup() {
      *     m_Recorder.setVideCodec("libx264");
      **/
 
+    ofAddListener(m_videoRecorder.outputFileCompleteEvent, this, &ofApp::recordingComplete);
+
     isRecordingVideo = false;
     isRecordingAudio = false;
 
@@ -72,8 +75,20 @@ void ofApp::setup() {
 
 void ofApp::update() {
     if(m_Grabber.isInitialized()) {
-        ofLog()<<"m_Grabber.update()";
+//        ofLog()<<"m_Grabber.update()";
        m_Grabber.update();
+    }
+    
+    if(bJoin == true && ofGetElapsedTimef() - joinTimer > 1){
+        bJoin = false;
+        m_videoRecorder.setOutputPath( ofToDataPath("test_joined.mov", true ));
+        bool success = m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
+        if(success){
+            ofLog()<<"yes stop";
+            m_videoRecorder.stop(false);
+        } else{
+            ofLog()<<"not stop";
+        }
     }
 }
 
@@ -147,7 +162,8 @@ void ofApp::draw() {
         ofDrawBitmapStringHighlight("Press spacebar to toggle video record."
                                     "\nPress (t) to save thumbnail."
                                     "\nPress (a) to save audio stream."
-                                    "\nPress (s) to start rtp video streaming.",
+                                    "\nPress (s) to start rtp video streaming."
+                                    "\nPress (x) rec vid + audio and join.",
                                     10, ofGetHeight() - 200 );
     }
     ofPopStyle();
@@ -179,8 +195,10 @@ void ofApp::keyReleased(int key) {
              OutputPixelFormat: yuv420p
              */
 //            isRecordingAudio = true;
-            
-            m_videoRecorder.setVideoCodec("libx264");
+          
+            m_videoRecorder.setVideoCodec("rawvideo");
+
+//            m_videoRecorder.setVideoCodec("libx264");
             m_videoRecorder.setBitRate(8000);
             m_videoRecorder.setPixelFormat(OF_IMAGE_COLOR);
             
@@ -239,30 +257,39 @@ void ofApp::keyReleased(int key) {
     }
     
     if(key == 'x'){
+        
         if( m_videoRecorder.isRecording() ) {
             // stop
             m_videoRecorder.stop();
             isRecordingVideo = false;
-            m_audioRecorder.stop();
-            isRecordingAudio = false;
             
-            m_videoRecorder.setOutputPath( ofToDataPath("test_joined.mov", true ));
-            m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
-            
-        } else {
+        }else{
 #if defined(TARGET_OSX)
             m_videoRecorder.setOutputPath( ofToDataPath("test.mov", true ));
 #else
             m_videoRecorder.setOutputPath( ofToDataPath("test.avi", true ));
 #endif
-        
-            m_videoRecorder.setVideoCodec("libx264");
+            m_videoRecorder.setVideoCodec("hap");
+//            m_videoRecorder.setVideoCodec("rawvideo");
+//            m_videoRecorder.setVideoCodec("libx264");
             m_videoRecorder.setBitRate(8000);
-            m_videoRecorder.setPixelFormat(OF_IMAGE_COLOR);
+//            m_videoRecorder.setPixelFormat(OF_IMAGE_COLOR);
 //            m_videoRecorder.setVideoOutCodec("hap -format hap ");
             isRecordingVideo = true;
             m_videoRecorder.startCustomRecord();
+        }
+        
+        if( m_audioRecorder.isRecording() ) {
+            // stop
+          
+            m_audioRecorder.stop();
+            isRecordingAudio = false;
             
+            //TODO: calling join video + audio here seems to be too soon since process fails
+//            m_videoRecorder.setOutputPath( ofToDataPath("test_joined.mov", true ));
+//            m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
+            
+        } else {
             m_audioRecorder.setOutputPath( ofToDataPath("test.mp3", true ));
             isRecordingAudio = true;
             m_audioRecorder.startCustomAudioRecord();
@@ -270,8 +297,26 @@ void ofApp::keyReleased(int key) {
     }
     
     if(key == 'j'){
+        ofLog()<<"manually trigger joining with recordingComplete being send once done ";
         m_videoRecorder.setOutputPath( ofToDataPath("test_joined.mov", true ));
-        m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
+       bool success = m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
+        if(success){
+            ofLog()<<"yes stop";
+            m_videoRecorder.stop();
+        } else{
+            ofLog()<<"not stop";
+        }
+    }
+    if(key == 'k'){
+        ofLog()<<"manually trigger joining without recordingComplete being send ";
+        m_videoRecorder.setOutputPath( ofToDataPath("test_joined.mov", true ));
+       bool success = m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
+        if(success){
+            ofLog()<<"yes stop";
+            m_videoRecorder.stop(false);
+        } else{
+            ofLog()<<"not stop";
+        }
     }
 }
 
@@ -322,4 +367,26 @@ void ofApp::audioIn(ofSoundBuffer & input){
 
     bufferCounter++;
 
+}
+
+//--------------------------------------------------------------
+void ofApp::recordingComplete(RecorderOutputFileCompleteEventArgs& args){
+    cout << "The recoded video file is now complete." << args.fileName    <<endl;
+    
+    if(ofIsStringInString(args.fileName, "test_joined") == false){
+        joinTimer = ofGetElapsedTimef();
+        bJoin = true;
+    }
+    
+    //TODO: calling join video + audio here seems to be too soon since process fails
+//    if(ofIsStringInString(args.fileName, "test_joined") == false){
+//        m_videoRecorder.setOutputPath( ofToDataPath("test_joined.mov", true ));
+//        bool success = m_videoRecorder.joinVideoAudio(ofToDataPath("test.mov", true ),ofToDataPath("test.mp3", true ));
+//        if(success){
+//            ofLog()<<"yes stop";
+//            m_videoRecorder.stop(false);
+//        } else{
+//            ofLog()<<"not stop";
+//        }
+//    }
 }

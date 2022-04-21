@@ -28,7 +28,7 @@ ofxFFmpegRecorder::ofxFFmpegRecorder()
 , m_DefaultVideoDevice()
 , m_DefaultAudioDevice()
 , m_VideCodec("mpeg4")
-, m_VideOutCodec("mpeg4")
+//, m_VideOutCodec("mpeg4")
 , m_AudioCodec("libmp3lame")
 , m_CustomRecordingFile(nullptr)
 , m_DefaultRecordingFile(nullptr)
@@ -345,10 +345,11 @@ bool ofxFFmpegRecorder::record(float duration)
     //    std::copy(m_AdditionalInputArguments.begin(), m_AdditionalInputArguments.end(), std::back_inserter(args));
     //    args = 
     args += " -i " + inputDevices;
-    args += " -vcodec " + m_VideOutCodec;// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
+    args += " -vcodec " + m_VideCodec;// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
     args += " -b:v " + std::to_string(m_BitRate) + "k";
     args += " -framerate " + std::to_string(m_Fps);
-    args += " -pix_fmt yuv420p";
+//    args += " -pix_fmt yuv420p";
+    args += " -pix_fmt rgba";
     args += " " + m_OutputPath;
 
 //    std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
@@ -404,17 +405,18 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-f rawvideo"); // -f video format, rawvideo since we manually add FBO pixel buffer frames
     //    args.push_back("-pix_fmt rgb24");
     args.push_back("-pix_fmt " + mPixFmt); //-pixel format, https://ffmpeg.org/ffmpeg.html#Advanced-Video-options
-    args.push_back("-vcodec " + m_VideCodec); //rawvideo");
+//    args.push_back("-vcodec " + m_VideCodec); //rawvideo");
+    args.push_back("-vcodec rawvideo");
     
     //input file options, https://ffmpeg.org/ffmpeg.html#toc-Description
     //in this video capture example input file == output file 
     args.push_back("-i -");
-    args.push_back("-vcodec " + m_VideOutCodec);// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
+    args.push_back("-vcodec " + m_VideCodec); //m_VideOutCodec);// alias for -c:v -codec:v,  https://ffmpeg.org/ffmpeg.html#Video-Options
 //    args.push_back("-c:v hap -format hap "); 
     args.push_back("-b:v " + std::to_string(m_BitRate) + "k"); // video bitrate, 
     args.push_back("-framerate " + std::to_string(m_Fps));
-    args.push_back("-pix_fmt yuv420p"); //
-    
+//    args.push_back("-pix_fmt yuv420p"); //
+    args.push_back("-pix_fmt rgba");
    
     //m_AdditionalOutputArguments like filters or conversion to other codec like HAP
     std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
@@ -633,8 +635,10 @@ size_t ofxFFmpegRecorder::addBuffer(const ofSoundBuffer &buffer, float afps){
     return written;
 }
 
-void ofxFFmpegRecorder::stop()
+
+void ofxFFmpegRecorder::stop(bool _notify)
 {
+    ofLog()<<"m_CustomRecordingFile "<<m_CustomRecordingFile<<" m_DefaultRecordingFile "<<m_DefaultRecordingFile;
     if (m_CustomRecordingFile) {
         #if defined(_WIN32)
         _pclose(m_CustomRecordingFile);
@@ -656,7 +660,7 @@ void ofxFFmpegRecorder::stop()
         m_DefaultRecordingFile = nullptr;
     }
     initialized = false;
-    outputFileComplete();
+    if(_notify)outputFileComplete();
 }
 
 void ofxFFmpegRecorder::cancel()
@@ -946,11 +950,17 @@ bool ofxFFmpegRecorder::joinVideoAudio(std::string _videoFilePath, std::string _
     cmd += args + " ";
     ofLog()<<"cmd:"<<cmd;
     
+//#if defined(_WIN32)
+//    m_DefaultRecordingFile = _popen(cmd.c_str(), "w");
+//#else
+//    m_DefaultRecordingFile = popen(cmd.c_str(), "w");
+//#endif
 #if defined(_WIN32)
-    m_DefaultRecordingFile = _popen(cmd.c_str(), "w");
+    m_CustomRecordingFile = _popen(cmd.c_str(), "wb");
 #else
-    m_DefaultRecordingFile = popen(cmd.c_str(), "w");
-#endif
+//    m_CustomRecordingFile = _popen(cmd.c_str(), "w");
+    m_CustomRecordingFile = popen( cmd.c_str(), "w" );
+#endif // _WIN32
     
     return true;
 }

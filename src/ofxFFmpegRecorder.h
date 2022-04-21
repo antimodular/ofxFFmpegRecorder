@@ -196,7 +196,7 @@ public:
      */
     size_t addBuffer(const ofSoundBuffer &buffer, float afps);
 
-    void stop();
+    void stop( bool _notify = true);
     void close() {stop();} ;
     /**
      * @brief Stops the recording and deletes the file.
