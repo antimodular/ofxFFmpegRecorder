@@ -265,11 +265,18 @@ void ofxFFmpegRecorder::setPaused(bool paused)
 void ofxFFmpegRecorder::setPixelFormat(ofImageType aType)
 {
     mPixFmt = "rgb24";
+    pixChannelCount = 3;
     if (aType == OF_IMAGE_COLOR) {
         mPixFmt = "rgb24";
+        pixChannelCount = 3;
+    }
+    else if (aType == OF_IMAGE_COLOR_ALPHA) {
+        mPixFmt = "rgba";
+        pixChannelCount = 4;
     }
     else if (aType == OF_IMAGE_GRAYSCALE) {
         mPixFmt = "gray";
+        pixChannelCount = 1;
     }
     else {
         ofLogError() << "unsupported format, setting to OF_IMAGE_COLOR";
@@ -404,7 +411,7 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-video_size " + std::to_string(static_cast<unsigned int>(m_VideoSize.x)) + "x" + std::to_string(static_cast<unsigned int>(m_VideoSize.y))); // -s same as -video_size sets input resolution
     args.push_back("-f rawvideo"); // -f video format, rawvideo since we manually add FBO pixel buffer frames
     //    args.push_back("-pix_fmt rgb24");
-    args.push_back("-pix_fmt " + mPixFmt); //-pixel format, https://ffmpeg.org/ffmpeg.html#Advanced-Video-options
+    args.push_back("-pix_fmt " + mPixFmt); //-pixel format, https://ffmpeg.org/ffmpeg.html#Advanced-Video-options rgb24 for GL_RGB and rgba for GL_RGBA
 //    args.push_back("-vcodec " + m_VideCodec); //rawvideo");
     args.push_back("-vcodec rawvideo");
     
@@ -416,7 +423,7 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-b:v " + std::to_string(m_BitRate) + "k"); // video bitrate, 
     args.push_back("-framerate " + std::to_string(m_Fps));
 //    args.push_back("-pix_fmt yuv420p"); //
-    args.push_back("-pix_fmt rgba");
+//    args.push_back("-pix_fmt rgba");
    
     //m_AdditionalOutputArguments like filters or conversion to other codec like HAP
     std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
@@ -440,6 +447,39 @@ bool ofxFFmpegRecorder::startCustomRecord()
     args.push_back("-pix_fmt yuv420p");
     args.push_back("-framerate " + std::to_string(m_Fps));
      */
+    
+    /*
+     -f fmt (input/output)
+     Force input or output file format. The format is normally auto detected for input files and guessed from the file extension for output files, so this option is not needed in most cases.
+     
+     -f rawvideo is basically a dummy setting that tells ffmpeg that your video is not in any container
+     
+     -vcodec rawvideo means that the video data within the container is not compressed
+     However, there are many ways uncompressed video could be stored, so it is necessary to specify the -pix_fmt option
+     
+     specified by the -i
+     reads from an arbitrary number of input "files" (which can be regular files, pipes, network streams, grabbing devices, etc.), 
+     
+     -y (global)
+     Overwrite output files without asking.
+     
+     -an (input/output)
+     As an input option, blocks all audio streams of a file from being filtered or being automatically selected or mapped for any output. 
+     
+     -s[:stream_specifier] size (input/output,per-stream)
+     Set frame size.
+
+     As an input option, this is a shortcut for the video_size private option, recognized by some demuxers for which the frame size is either not stored in the file or is configurable – e.g. raw video or video grabbers.
+
+     As an output option, this inserts the scale video filter to the end of the corresponding filtergraph. Please use the scale filter directly to insert it at the beginning or some other place.
+
+     The format is ‘wxh’ (default - same as source).
+     
+     -vcodec codec (output)
+     Set the video codec. This is an alias for -codec:v
+     
+     */
+    
     std::copy(m_AdditionalOutputArguments.begin(), m_AdditionalOutputArguments.end(), std::back_inserter(args));
     
     args.push_back(m_OutputPath);
@@ -881,11 +921,12 @@ void ofxFFmpegRecorder::determineDefaultDevices()
 
 void ofxFFmpegRecorder::processFrame()
 {
+ 
     while (isRecording()) {
         ofPixels *pixels = nullptr;
         if (m_Frames.consume(pixels) && pixels) {
             const unsigned char *data = pixels->getData();
-            const size_t dataLength = m_VideoSize.x * m_VideoSize.y * 3;
+            const size_t dataLength = m_VideoSize.x * m_VideoSize.y * pixChannelCount;
             const size_t written = fwrite(data, sizeof(char), dataLength, m_CustomRecordingFile);
             if (written <= 0) {
                 LOG_WARNING("Cannot write the frame.");

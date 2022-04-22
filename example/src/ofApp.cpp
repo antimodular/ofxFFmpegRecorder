@@ -72,9 +72,12 @@ void ofApp::draw() {
     
 
     mCapFbo.begin(); {
-        ofBackground(0);
+        ofClear(0,0,0, 0);
+//        ofBackground(0);
         ofSetColor( 255 );
-        m_Grabber.draw(0, 0, mCapFbo.getWidth(), mCapFbo.getHeight() );
+        m_Grabber.draw(100, 100, mCapFbo.getWidth(), mCapFbo.getHeight() );
+        
+        ofSetColor( 255,127 );
         ofDrawCircle(mouseX,mouseY, 30);
        // ofSetColor(ofColor::green);
       //  if( m_Recorder.isRecording() ) ofSetColor( ofColor::red );

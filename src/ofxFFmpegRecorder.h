@@ -30,6 +30,7 @@ struct LockFreeQueue {
 
     void produce(const T &t)
     {
+       
         m_List.push_back(t);
         m_TailIt = m_List.end();
         m_List.erase(m_List.begin(), m_HeadIt);
@@ -353,5 +354,5 @@ private:
 
     void outputFileComplete();
     
-
+    int pixChannelCount = 3;
 };
