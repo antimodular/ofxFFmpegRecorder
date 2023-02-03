@@ -168,7 +168,7 @@ public:
      * @return If the class was already recording a video/audio this method returns false, otherwise it returns true;
      */
     bool startCustomRecord();
-    bool start(){ startCustomRecord(); };
+    bool start(){ return startCustomRecord(); };
     /**
      * @brief Setup ffmpeg for a custom audio recording. This also inherits the
      * m_AdditionalArguments.
